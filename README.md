@@ -49,6 +49,9 @@ kubectl port-forward svc/order-service -n inventory-order-app-helm 8082:80   # h
   and rollback are Argo CD's (`argocd app history|rollback`)
 - the inventory Deployment omits `replicas` when the HPA is on, so
   `selfHeal` doesn't fight autoscaling
+- the HPA targets memory at 60% of a 256Mi request, which the app exceeds
+  on its own, so inventory-service scales up (2+ pods in testing); raise
+  `inventoryService.resources.requests.memory` or the target to change that
 - NodePorts are 30083 / 30084, so this can run beside the plain-YAML repo
 - `mysql.rootPassword` in `values.yaml` is a plaintext demo value — use a
   real secret mechanism for anything beyond a demo
@@ -57,6 +60,7 @@ kubectl port-forward svc/order-service -n inventory-order-app-helm 8082:80   # h
 
 ```bash
 kubectl delete -f application.yaml
+kubectl delete namespace inventory-order-app-helm   # the namespace itself is left behind
 ```
 
 Same app as plain YAML: `argocd-inventory-order-app-simple`. Concepts:
