@@ -1,0 +1,70 @@
+# Defaults = the committed demo-test/inventory-order-app manifests:
+# inventory-service on the `prod` Spring profile backed by MySQL, plus
+# order-service calling inventory-service over its Service name.
+
+inventoryService:
+  image:
+    repository: ram1uj/part-inventory-service
+    tag: v2
+  service:
+    type: NodePort
+    port: 80
+    # 30084/30083 (not the plain manifests' 30081/30082) so this chart and
+    # simple-deployment can run on the same cluster without a port clash
+    nodePort: 30084
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  # When enabled the Deployment omits `replicas` entirely so the HPA owns
+  # the count — otherwise Argo CD (selfHeal) and the HPA fight over it.
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 50
+    targetMemoryUtilizationPercentage: 60
+  # only used when autoscaling.enabled is false
+  replicaCount: 1
+
+orderService:
+  image:
+    repository: ram1uj/part-order-service
+    tag: latest
+  replicaCount: 2
+  service:
+    type: NodePort
+    port: 80
+    nodePort: 30083
+  resources:
+    requests:
+      cpu: 100m
+      memory: 400Mi
+    limits:
+      cpu: 500m
+      memory: 600Mi
+
+# mysql.enabled: false -> no MySQL objects, inventory-service falls back to
+# the `dev` Spring profile (in-memory H2, per-pod state)
+mysql:
+  enabled: true
+  image: mysql:8.0
+  port: 3306
+  database: part_inventory_db
+  user: root
+  # DEMO ONLY — plaintext in Git is exactly what GitOps makes dangerous.
+  # Real setups use Sealed Secrets / External Secrets / SOPS instead; see
+  # https://github.com/ramanujds/devops-learning-journey/blob/main/git-ops-argocd/02-gitops-problem.md
+  # ("What GitOps does not fix").
+  rootPassword: password
+  storage: 1Gi
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi

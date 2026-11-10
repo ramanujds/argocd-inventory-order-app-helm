@@ -1,0 +1,9 @@
+apiVersion: v2
+name: inventory-order-app
+description: >-
+  order-service + inventory-service + MySQL, templated from the plain
+  manifests in demo-test/inventory-order-app/. Meant to be deployed by
+  Argo CD (see ../application.yaml).
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

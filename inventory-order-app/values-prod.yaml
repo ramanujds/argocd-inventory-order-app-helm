@@ -1,0 +1,11 @@
+# Overlay on values.yaml — use with `helm.valueFiles: [values.yaml, values-prod.yaml]`
+# in ../application.yaml. Only the differences live here.
+inventoryService:
+  autoscaling:
+    minReplicas: 2
+    maxReplicas: 8
+
+orderService:
+  replicaCount: 3
+  service:
+    type: LoadBalancer
