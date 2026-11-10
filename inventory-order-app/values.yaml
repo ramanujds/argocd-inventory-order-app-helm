@@ -34,7 +34,7 @@ orderService:
   image:
     repository: ram1uj/part-order-service
     tag: latest
-  replicaCount: 2
+  replicaCount: 3
   service:
     type: NodePort
     port: 80
