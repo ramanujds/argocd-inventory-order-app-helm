@@ -111,7 +111,7 @@ valueFiles:
 Precedence, lowest to highest: `values.yaml` → `valueFiles` →
 `valuesObject` → `parameters`.
 
-**Gotchas**
+**Gotchas:**
 
 - a `valueFiles` entry that doesn't exist gives `ComparisonError`; set
   `helm.ignoreMissingValueFiles: true` to make a file optional
