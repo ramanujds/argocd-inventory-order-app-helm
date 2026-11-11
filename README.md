@@ -5,8 +5,10 @@ Argo CD deployment of the inventory-order-app from a **Helm chart**: the
 
 ```text
 application.yaml                  # the Argo CD Application (apply this once, by hand)
+application-dev.yaml              # same chart, dev values, own namespace
 inventory-order-app/              # the chart
   values.yaml                     # defaults
+  values-dev.yaml                 # overlay: H2 (no MySQL), 1 replica each, no HPA
   values-prod.yaml                # overlay: more replicas, LoadBalancer
   templates/
     mysql.yaml                    # Secrets, PVC, Service, Deployment   (sync wave 0)
@@ -38,10 +40,84 @@ kubectl port-forward svc/order-service -n inventory-order-app-helm 8082:80   # h
 
 - **change values, not templates**: edit `inventory-order-app/values.yaml`,
   push, Argo CD rolls it out
-- to use the prod overlay add `values-prod.yaml` to `helm.valueFiles` in
-  `application.yaml`; for a one-off override use `helm.valuesObject`
 - `mysql.enabled: false` drops MySQL and flips inventory to the `dev`
   (in-memory H2) Spring profile
+
+## Choosing an environment (values-dev.yaml / values-prod.yaml)
+
+Argo CD picks a values file through the Application's `helm.valueFiles`.
+The chart's own `values.yaml` is always the base; each file you list is
+layered on top of it, and later files win.
+
+| File | What it changes | Result |
+| --- | --- | --- |
+| `values.yaml` (default) | — | MySQL, `prod` profile, order ×2, inventory on an HPA |
+| `values-dev.yaml` | `mysql.enabled: false`, no HPA, 1 replica each, inventory `ClusterIP`, order NodePort 30085 | 4 objects, H2 in memory |
+| `values-prod.yaml` | inventory HPA 2–8, order ×3, order `LoadBalancer` | same objects, bigger |
+
+**1. Preview what Argo CD will render** (no cluster needed):
+
+```bash
+helm template inventory-order-app ./inventory-order-app -f inventory-order-app/values-dev.yaml
+```
+
+**2a. Deploy dev as its own Application** (next to the default app):
+
+```bash
+kubectl apply -f application-dev.yaml -n argocd
+
+argocd app get inventory-order-app-helm-dev
+kubectl get all -n inventory-order-app-dev
+kubectl port-forward svc/order-service -n inventory-order-app-dev 8084:80   # http://localhost:8084
+```
+
+The only difference from `application.yaml` is this block (path is relative
+to `source.path`, i.e. the chart directory):
+
+```yaml
+helm:
+  valueFiles:
+    - values-dev.yaml
+```
+
+**2b. Or switch the existing Application to dev** — edit `valueFiles` in
+`application.yaml`, then re-apply it (editing the file in Git alone does
+nothing: you applied the `Application` by hand, so Argo CD isn't watching
+it):
+
+```bash
+kubectl apply -f application.yaml -n argocd
+```
+
+Or change the live object directly (it then differs from the YAML, and a
+parent app-of-apps with `selfHeal` would revert it):
+
+```bash
+argocd app set inventory-order-app-helm --values values-dev.yaml
+```
+
+Switching an app from the default to dev prunes MySQL, the PVC (data is
+lost) and the HPA, because `prune: true`.
+
+**3. Combine files** — later wins, so a team-specific tweak can sit on top:
+
+```yaml
+valueFiles:
+  - values-dev.yaml
+  - values-dev-eu.yaml        # hypothetical; overrides anything in values-dev.yaml
+```
+
+Precedence, lowest to highest: `values.yaml` → `valueFiles` →
+`valuesObject` → `parameters`.
+
+**Gotchas**
+
+- a `valueFiles` entry that doesn't exist gives `ComparisonError`; set
+  `helm.ignoreMissingValueFiles: true` to make a file optional
+- NodePorts are per cluster: default uses 30083/30084, dev uses 30085, so
+  all of them fit together; two copies of the *same* values would clash
+- a values-file change only takes effect after it's pushed to
+  `targetRevision` (`main`)
 
 ## Notes
 
@@ -61,6 +137,8 @@ kubectl port-forward svc/order-service -n inventory-order-app-helm 8082:80   # h
 ```bash
 kubectl delete -f application.yaml
 kubectl delete namespace inventory-order-app-helm   # the namespace itself is left behind
+kubectl delete -f application-dev.yaml              # if you deployed dev
+kubectl delete namespace inventory-order-app-dev
 ```
 
 Same app as plain YAML: `argocd-inventory-order-app-simple`. Concepts:

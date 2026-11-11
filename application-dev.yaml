@@ -1,0 +1,38 @@
+# Dev environment: same chart as application.yaml, but with values-dev.yaml
+# (H2, 1 replica each, no HPA) in its own namespace, so it can run side by
+# side with the default app.
+#
+#   kubectl apply -f application-dev.yaml -n argocd
+#
+# See README.md -> "Choosing an environment".
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: inventory-order-app-helm-dev
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/ramanujds/argocd-inventory-order-app-helm
+    targetRevision: main
+    path: inventory-order-app   # same chart as the default app
+    helm:
+      releaseName: inventory-order-app
+      # values.yaml (chart defaults) is always the base; values-dev.yaml is
+      # layered on top. The path is relative to `path` above.
+      valueFiles:
+        - values-dev.yaml
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: inventory-order-app-dev
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
