@@ -96,8 +96,9 @@ parent app-of-apps with `selfHeal` would revert it):
 argocd app set inventory-order-app-helm --values values-dev.yaml
 ```
 
-Switching an app from the default to dev prunes MySQL, the PVC (data is
-lost) and the HPA, because `prune: true`.
+Switching an app from the default to dev prunes MySQL, its Secrets, the
+PVC (data is lost) and the HPA, because `prune: true` (verified: MySQL,
+PVC and Secrets were removed within about a minute of the switch).
 
 **3. Combine files** — later wins, so a team-specific tweak can sit on top:
 
